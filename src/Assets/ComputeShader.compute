@@ -8,11 +8,15 @@ struct Particle
     float3 pos;
     float3 vel;
     float3 color;
+    float ref;
 };
 
 // 変数定義
 RWStructuredBuffer<Particle> Particles;
 float deltaTime;
+
+AppendStructuredBuffer<uint> Visibles;
+float4x4 mVP;
 
 // 便利関数
 float rand(float2 st)
@@ -46,6 +50,8 @@ void init(uint id)
 
     p.color = rand3(seed);
 
+    p.ref = rand(seed * 7);
+
     Particles[id] = p;
 }
 
@@ -64,12 +70,32 @@ void update(uint id : SV_DispatchThreadID)
 {
     Particle p = Particles[id];
 
-    if (p.pos.y < -10) {// 下に行きすぎたらリセット
+    if (p.pos.y < -10) {
+        // 下に行きすぎたらリセット
         init(id);
     }else{
         // 陽オイラー
+        float y = p.pos.y;
         p.pos += p.vel * deltaTime;
         p.vel.y -=  9.8 * deltaTime;
+
+        if (0.0 < y && p.pos.y < 0.0 &&
+            -5.0 < p.pos.x && p.pos.x < 5.0 &&
+            -5.0 < p.pos.z && p.pos.z < 5.0)
+        {
+            //反射
+            p.vel.y = -p.ref * p.vel.y;
+        }
+
+        //カリング
+        float4 screen_pos = mul(mVP, float4(p.pos, 1.0));
+        float range = 0.5;
+        //if (-range <= screen_pos.x / screen_pos.w && screen_pos.x / screen_pos.w <= range
+        // && -range <= screen_pos.y / screen_pos.w && screen_pos.y / screen_pos.w <= range
+        // &&    0.0 <= screen_pos.z / screen_pos.w && screen_pos.z / screen_pos.w <= 1.0);
+        {
+            Visibles.Append(id);
+        }
 
         // 値の格納
         Particles[id] = p;
